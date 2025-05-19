@@ -14,9 +14,26 @@
 . $PSScriptRoot\local_variables.ps1
 
 function Copy-ProfileObjects {
-    [alias("cprofile")]
-    param ()
+    [alias("cpprof")]
+    param (
+        [switch]$push
+    )
     Set-Content -Path $CopyProfilePath -Value (Get-Content $Profile)
+
+    if ($push) {
+        $oldDirectory = (Get-Location).path
+        Set-Location (Split-Path $CopyProfilePath)
+        
+        git add .
+        Write-Host "Write commit message for pushing to origin" -ForegroundColor Yellow
+        $commitMessage = Read-Host
+        git commit -m ($commitMessage)
+        git push origin main
+        
+        Set-Location $oldDirectory
+    }
+
+
 }
 
 function Edit-EnvironmentalVariable() {
@@ -34,8 +51,21 @@ function Open-Zoom {
 function Open-Wolfram {
     [alias("wolfram")]
     param (
-        [string]$v
+        [string]$v,
+		[switch]$listversions
     )
+	
+	if($listversions){
+		Write-Host "Printing available versions..."
+		Write-Host "Mathematica" -ForegroundColor Blue
+		Get-ChildItem "C:\Program Files\Wolfram Research\Mathematica"
+		Write-Host "Wolfram" -ForegroundColor Blue
+		Get-ChildItem "C:\Program Files\Wolfram Research\Wolfram"
+		break
+	}
+	
+	
+	
     $versionTuple = $v.Split(".")
     
     if (
@@ -46,7 +76,7 @@ function Open-Wolfram {
     } else
     {
         $path = (Join-Path -Path "C:\Program Files\Wolfram Research\Wolfram" -ChildPath "$v\WolframNB.exe")
-     }
+    }
 
     Write-Host "Starting: $path" -ForegroundColor Blue
     Start-Process $path
@@ -130,7 +160,7 @@ function Set-PowershellTheme {
     )
     $json = Get-Content $LocalPowershellSettings | ConvertFrom-Json
     $json.profiles.list[0].colorScheme = $theme
-    $json | ConvertTo-Json -depth 100 | Set-Content $json_path
+    $json | ConvertTo-Json -depth 100 | Set-Content $LocalPowershellSettings
 }
 
 function Set-Workspace {
@@ -259,4 +289,20 @@ function Open-MicrosoftOffice {
 		'onote'	{& Join-Path $officePath -ChildPath 'ONENOTE.exe'}
 	}
 	
+}
+
+function Open-GoogleSearch {
+    [alias("google")]
+    param()
+ 
+    if(-not $args){
+        $search = (Get-Clipboard).Replace(" ","+")
+    } else {
+        $search = $args -join "+"
+    }
+
+    $url = "https://www.google.com/search?q=$search&udm=14"
+
+    Start-Process msedge -ArgumentList $url
+
 }
