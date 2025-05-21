@@ -166,7 +166,8 @@ function Set-PowershellTheme {
 function Set-Workspace {
     [alias("workspace")]
     param(
-        [string]$val
+        [string]$val,
+        [switch]$kill
     ) 
     $registryPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
     $isDarkModeEnabled = ((Get-ItemPropertyValue -Path $registryPath -Name AppsUseLightTheme) -eq 0) -and ((Get-ItemPropertyValue -Path $registryPath -Name SystemUsesLightTheme) -eq 0)
@@ -175,12 +176,19 @@ function Set-Workspace {
         $pict = Join-Path -Path $WallPaperImagesDirectory -ChildPath "working.jpg"
 
         if ($isDarkModeEnabled){
-            Write-Host "Setting light mode"
+            Write-Host "`nSetting light mode"
             Start-Process ms-settings:colors
-            Write-Host "Setting light mode on pow"
+            Write-Host "`nSetting light mode on pow"
             Set-PowershellTheme 'One Half Light (Copy)'
-            Write-Host "Moving... "
+            Write-Host "`nMoving... "
             Set-Location $WorkDirectory
+            Write-Host "`nConnecting to vpn..."
+            openvpn --config $OpenVPNConfig
+            Write-Host "`nOpening Mitel..."
+            Mitel.exe
+            Write-Host "`nOpening Zoom...`n"
+            Open-Zoom
+
         } else {
             Write-Host "Computer is already set on light mode."
         }
@@ -196,6 +204,13 @@ function Set-Workspace {
             Write-Host "Setting dark mode on pow"
             Set-PowershellTheme 'One Half Dark'
             Set-Location $Env:HOMEPATH
+
+            if ($kill) {
+                Get-Process | Where-Object {$_.ProcessName -match 'mitel'} | Stop-Process
+                Get-Process | Where-Object {$_.ProcessName -match 'zoom'} | Stop-Process
+                openvpn --command disconect_all
+            }
+
         } else {
             Write-Host "Computer is already set on dark mode. Changing desktop wallpaper accordingly." -ForegroundColor Blue
         }
