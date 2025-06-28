@@ -384,3 +384,23 @@ function Set-HideItem {
 
 }
 
+function Set-LocationModified {
+	[alias("mcd")]
+	param(
+		[string] $path
+	)
+		
+	if (-not $path){
+		$path = Get-Clipboard
+	}
+	
+	if ($path.PSIsContainer) {
+		# If it's a directory:
+		Set-Location ($path)
+	} else {
+		# If it's a file
+		Set-Location (Split-Path $path)
+	}
+	
+}
+
