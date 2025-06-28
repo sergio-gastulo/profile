@@ -335,8 +335,16 @@ function Write-ToLog {
 	[alias("log")]
 	param(
 		[string] $category, 
-		[string] $log
+		[string] $log,
+		[int] $check
 	)
+
+	if ($check) {
+		Write-Host "`nFrom latest to earliest" -ForegroundColor Blue
+		"SELECT * FROM log ORDER BY timestamp DESC LIMIT $check" | sqlite3 $LogDatabase
+		Write-Host "`n"
+		break
+	}
 	
 	$validCategoryList = @('w','o','s')
 	if (-not ( ($category) -and ($category -in $validCategoryList) )) {
