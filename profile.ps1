@@ -1,16 +1,3 @@
-<#
-    Variables that should be defined on .\local_variables.ps1
-    --
-        $CopyProfilePath
-        $ZoomPath
-        $LocalPowershellSettings
-        $WallPaperImagesDirectory
-        $WorkDirectory
-        $NewScreenshotsDirectory
-    --
-    Dot-Sourcing variables at Powershell startup. 
-#>
-
 #Loading Variables to Profile
 . $PSScriptRoot\local_variables.ps1
 
@@ -158,7 +145,7 @@ function Open-EdgeFileExplorer{
         Write-Host "`nOpening Edge file browser in current directory: $path.`n" -ForegroundColor Blue
     } else {
         $path = (Resolve-Path $path)
-        Write-Host "`nOpening Edge file browser for specified path.`n"
+        Write-Host "`nOpening Edge file browser path: $path.`n" -ForegroundColor Blue
     }
     Start-Process "msedge.exe" -ArgumentList $path
     
@@ -346,10 +333,10 @@ function Write-ToLog {
 		break
 	}
 	
-	$validCategoryList = @('w','o','s')
+	$validCategoryList = @('w','o','s', 'h')
 	if (-not ( ($category) -and ($category -in $validCategoryList) )) {
 		:validation do {
-		$category = Read-Host "Is this (w)ork, (o)ut or (s)tudying?"
+		$category = Read-Host "Is this (w)ork, (o)ut, (h)ome or (s)tudying?"
 		if (-not ($category -in $validCategoryList)){
 			Write-Host "This is not a valid option!" -ForegroundColor Red				
 			Write-Host "Validating again`n" -ForegroundColor Yellow
@@ -364,10 +351,11 @@ function Write-ToLog {
 	}
 	
 	#Making sure that $log does not contains "'" (escape characters by default on sqlite3)
-	$log = $log.Replace("'","''")	
+	$log = $log.Replace("'","''")
+
 
 	$command = "INSERT INTO log VALUES (strftime('%Y-%m-%d %H:%M:%S','now','localtime'),'$category','$log')"
-
+	
 	#Warning! This is insecure since it's prone to SQL inkections. 
 	$command | sqlite3.exe $LogDatabase  
 }
