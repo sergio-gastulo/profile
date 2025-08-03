@@ -51,6 +51,7 @@ function Open-Wolfram {
     [alias("wolfram")]
     param (
         [string]$v,
+		[string]$file,
 		[switch]$listversions
     )
 	
@@ -76,9 +77,15 @@ function Open-Wolfram {
     {
         $path = (Join-Path -Path "C:\Program Files\Wolfram Research\Wolfram" -ChildPath "$v\WolframNB.exe")
     }
+	
+	if ($file){
+    	Write-Host "Opening: $file with $open" -ForegroundColor Blue
+    	Start-Process "$path $file" 
+	} else {
+    	Write-Host "Starting: $path" -ForegroundColor Blue
+    	Start-Process $path
+	}
 
-    Write-Host "Starting: $path" -ForegroundColor Blue
-    Start-Process $path
 }
 
 function Save-ClipboardImage {
@@ -166,11 +173,11 @@ function Set-Workspace {
     [alias("workspace")]
     param(
         [string]$val,
-        [switch]$kill
+        [switch]$officeMode
     ) 
     $registryPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
     $isDarkModeEnabled = ((Get-ItemPropertyValue -Path $registryPath -Name AppsUseLightTheme) -eq 0) -and ((Get-ItemPropertyValue -Path $registryPath -Name SystemUsesLightTheme) -eq 0)
-
+	
     if ($val -in @('w', 'wolfram','light-mode') ){
         $pict = Join-Path -Path $WallPaperImagesDirectory -ChildPath "working.jpg"
 
@@ -179,18 +186,19 @@ function Set-Workspace {
             Start-Process ms-settings:colors
             Write-Host "`nSetting light mode on pow"
             Set-PowershellTheme 'One Half Light (Copy)'
-            Write-Host "`nMoving... "
-            Set-Location $WorkDirectory
-            Write-Host "`nConnecting to vpn..."
-            $env:WOLFRAMPWD | Set-Clipboard
-	    openvpn --config $OpenVPNConfig
-		Write-Host "`nOpening Mitel..."
-            Mitel.exe
-            Write-Host "`nOpening Zoom...`n"
-            Open-Zoom
+            
+			if($officeMode){
+				Write-Host "`nMoving... "
+            	Set-Location $WorkDirectory
+				Write-Host "`nOpening Mitel..."
+            	Mitel.exe
+            	Write-Host "`nOpening Zoom...`n"
+            	Open-Zoom
+			}
+
 
         } else {
-            Write-Host "Computer is already set on light mode."
+            Write-Host "Computer is already set on light mode. No changes will apply"
         }
         
     } elseif ($val -in @('o', 'out','dark','darkmode','dark-mode')) {
@@ -218,6 +226,7 @@ function Set-Workspace {
     } else {
         Write-Host "`nWrong Flag. Run Again`n" -ForegroundColor Red
     }
+	# From https://www.powershellgallery.com/Packages/VirtualDesktop/1.5.7
     Set-AllDesktopWallpapers $pict
 }
 
@@ -260,7 +269,7 @@ function Get-YouTube {
         }
         if ($flag -match 'v=([^&]+)') {
             $videoId = $matches[1]
-            $url = -join ("https://www.youtube.com/embed/", $videoId)
+            $url = -join ("microsoft-edge:https://www.youtube.com/embed/", $videoId)
             Start-Process $url  
         } else {
             Write-Error "No valid link. Closing."
@@ -268,12 +277,12 @@ function Get-YouTube {
         }
 
     } elseif ( $flag -eq 'h') {
-        $url = 'https://www.youtube.com/feed/history'
+        $url = 'microsoft-edge:https://www.youtube.com/feed/history'
         Start-Process $url 
         break
 
     } elseif ($flag -eq 'wl'){
-        $url = 'https://www.youtube.com/playlist?list=WL'
+        $url = 'microsoft-edge:https://www.youtube.com/playlist?list=WL'
         Start-Process $url 
         break
     }
@@ -373,8 +382,7 @@ function Set-HideItem {
 }
 
 function Set-LocationModified {
-	[alias("mcd")]
-	param(
+	[alias("mcd")] param(
 		[string] $path
 	)
 		
@@ -382,13 +390,35 @@ function Set-LocationModified {
 		$path = Get-Clipboard
 	}
 	
+	$path = Resolve-Path $path
+	
+	if(-not (Test-Path $path)){
+		$opt = $null 
+		Write-Host "'$path' is not a valid path."
+		Write-Host @"
+Select any of the following options:
+	{
+		c: create directory '$path'
+		f: create file '$path'
+		q: quit
+	}
+"@
+		$opt = Read-Host "[c/f/[q]]"
+		switch ($opt) {
+			'c' {New-Item $path -ItemType "File"}
+			'f' {New-Item $path -ItemType "Directory"}
+			'q' {return}
+			Default {Write-Host "Unknown option. Breaking"; return}
+		}	
+		return
+	}
+
 	if ($path.PSIsContainer) {
-		# If it's a directory:
+		# If it's a directory, move to directory.
 		Set-Location ($path)
 	} else {
-		# If it's a file
+		# If it's a file, move to directory where it is located, move to directory where it is located..
 		Set-Location (Split-Path $path)
 	}
 	
 }
-
