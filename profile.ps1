@@ -173,7 +173,9 @@ function Set-Workspace {
     [alias("workspace")]
     param(
         [string]$val,
-        [switch]$officeMode
+        [switch]$officeMode,
+		[switch]$kill
+
     ) 
     $registryPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
     $isDarkModeEnabled = ((Get-ItemPropertyValue -Path $registryPath -Name AppsUseLightTheme) -eq 0) -and ((Get-ItemPropertyValue -Path $registryPath -Name SystemUsesLightTheme) -eq 0)
@@ -303,10 +305,10 @@ function Open-MicrosoftOffice {
     $officePath = 'C:\Program Files\Microsoft Office\root\Office16' 
 	
     switch($val){
-		'word'	{& Join-Path $officePath -ChildPath 'WINWORD.exe'}
-		'excel'	{& Join-Path $officePath -ChildPath 'EXCEL.exe'}
-		'point'	{& Join-Path $officePath -ChildPath 'POWERPNT.exe'}
-		'onote'	{& Join-Path $officePath -ChildPath 'ONENOTE.exe'}
+		'word'	{Start-Process (Join-Path $officePath -ChildPath 'WINWORD.exe') }
+		'excel'	{Start-Process (Join-Path $officePath -ChildPath 'EXCEL.exe') }
+		'point'	{Start-Process (Join-Path $officePath -ChildPath 'POWERPNT.exe') }
+		'onote'	{Start-Process (Join-Path $officePath -ChildPath 'ONENOTE.exe') }
 	}
 	
 }
@@ -376,42 +378,43 @@ function Set-HideItem {
 	)
 		
 	Write-Host "Hidding file: $path"
-	$item = Get-Item $path
-	$item.Attributes = $item.Attributes -bor "Hidden"
+	try {
+		$item = Get-Item $path -ErrorAction Stop
+		$item.Attributes = $item.Attributes -bor "Hidden"
+	} catch {
+		Write-Host "'$path' does not exist."
+	}
 
 }
 
 function Set-LocationModified {
-	[alias("mcd")] param(
+	[alias("mcd")] 
+
+	param(
 		[string] $path
 	)
-		
-	if (-not $path){
-		$path = Get-Clipboard
-	}
 	
-	$path = Resolve-Path $path
-	
-	if(-not (Test-Path $path)){
+	if(-not (Test-Path $path)){ # if file doesn't exist
 		$opt = $null 
 		Write-Host "'$path' is not a valid path."
 		Write-Host @"
 Select any of the following options:
 	{
-		c: create directory '$path'
+		d: create directory '$path'
 		f: create file '$path'
 		q: quit
 	}
 "@
-		$opt = Read-Host "[c/f/[q]]"
+		$opt = Read-Host "[d/f/[q]]"
 		switch ($opt) {
-			'c' {New-Item $path -ItemType "File"}
-			'f' {New-Item $path -ItemType "Directory"}
+			'd' {New-Item $path -ItemType "Directory"}
+			'f' {New-Item $path -ItemType "File"}
 			'q' {return}
-			Default {Write-Host "Unknown option. Breaking"; return}
+			Default {Write-Host "Unknown option. Breaking" -ForegroundColor Red; break}
 		}	
-		return
 	}
+
+	$path = Get-Item (Resolve-Path $path)
 
 	if ($path.PSIsContainer) {
 		# If it's a directory, move to directory.
@@ -421,4 +424,42 @@ Select any of the following options:
 		Set-Location (Split-Path $path)
 	}
 	
+}
+
+
+function Get-Time {
+	[alias("time")]
+	param(
+		[string] $offset
+	)
+
+	(Get-Date).AddHours($offset)
+}
+
+
+function New-Todo{
+	[alias("todo")]
+	param(
+		[string] $name,
+		[switch] $move
+	)
+	
+	if ($move){
+		# first search for TODOs on current directory
+		$todos = Get-ChildItem . -Filter 'todo*'
+		# move them to TODO's dir
+		foreach ($todo in $todos) {
+			Move-Item -Path $todo.FullName -Destination $TODODirectory
+		}
+		Write-Host "All TODO files have been transferred to '$TODODirectory'."
+		return
+	}
+
+	if (-not $name) {
+		$name = (Get-Date).ToString("yyyy-MM-dd")
+	}
+	$name = "todo-" + $name
+
+	New-Item -Name $name -ItemType "File"
+	Write-Host "New todo file: $name"
 }
