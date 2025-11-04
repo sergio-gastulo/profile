@@ -1,10 +1,20 @@
-#Loading Variables to Profile
+# Loading Variables to Profile
 . $PSScriptRoot\local_variables.ps1
 
+# Getting rid of Microsoft Copyright
+Clear-Host
+
+# Loading variables, perhaps there is a better and more elegant way?
 $LocalVariableProfile = "$PSScriptRoot\local_variables.ps1" 
 
+
+
+# This function prints the loaded variables automatically, whenever needed.			
 function Print-Variables {
-	# This function prints the loaded variables automatically, whenever needed.			
+	[alias("pvar")]
+	param(
+
+	)
 	Write-Host "["
 	(Get-Content $LocalVariableProfile | Select-String -Pattern '^\$.\w*[^ =]').Matches.Value | ForEach-Object {
 		Write-Host "`n{`n`tVariable: `t$_ `n`tPath: `t`t$(Invoke-Expression $_)`n},"	
@@ -12,6 +22,9 @@ function Print-Variables {
 	Write-Host "]"
 }
 
+
+# Function that copies profile to ~\projects\profile
+# if -push, it asks for a commit message to push to git
 function Copy-ProfileObjects {
     [alias("cpprof")]
     param (
@@ -35,64 +48,70 @@ function Copy-ProfileObjects {
 
 }
 
+
+# function to manually edit environmental variables
 function Edit-EnvironmentalVariable() {
     [alias("edit_env")]
         param()
 	cmd /c "sysdm.cpl"
 }
 
+
+# opens zooms duh
 function Open-Zoom {
     [alias("zoom")]
-    param()
+    param(
+	
+	)
     Start-Process $ZoomPath
 }
 
+
+# opens wolfram mathematica software, specifying version
 function Open-Wolfram {
     [alias("wolfram")]
     param (
         [string]$v,
-		[string]$file,
 		[switch]$listversions
     )
+
+	$GeneralDirectory = Join-Path -Path $env:PROGRAMFILES -ChildPath "Wolfram Research"
+	$MathematicaDir = Join-Path $GeneralDirectory -ChildPath "Mathematica"
+	$WolframDir = Join-Path $GeneralDirectory -ChildPath "Wolfram"
 	
 	if($listversions){
 		Write-Host "Printing available versions..."
 		Write-Host "Mathematica" -ForegroundColor Blue
-		Get-ChildItem "C:\Program Files\Wolfram Research\Mathematica"
+		Get-ChildItem $MathematicaDir
 		Write-Host "Wolfram" -ForegroundColor Blue
-		Get-ChildItem "C:\Program Files\Wolfram Research\Wolfram"
-		break
+		Get-ChildItem $WolframDir
+		return
 	}
 	
 	
-	
     $versionTuple = $v.Split(".")
-    
     if (
         ($versionTuple[0] -lt 14) -or
         ($versionTuple[0] -eq 14 -and $versionTuple[1] -eq 0)
     ) {
-        $path = (Join-Path -Path "C:\Program Files\Wolfram Research\Mathematica" -ChildPath "$v\Mathematica.exe")
+        $path = (Join-Path -Path $MathematicaDir -ChildPath "$v\Mathematica.exe")
     } else
     {
-        $path = (Join-Path -Path "C:\Program Files\Wolfram Research\Wolfram" -ChildPath "$v\WolframNB.exe")
+        $path = (Join-Path -Path $WolframDir -ChildPath "$v\WolframNB.exe")
     }
 	
-	if ($file){
-    	Write-Host "Opening: $file with $open" -ForegroundColor Blue
-    	Start-Process "$path $file" 
-	} else {
-    	Write-Host "Starting: $path" -ForegroundColor Blue
-    	Start-Process $path
-	}
+	Write-Host "Starting: $path" -ForegroundColor Blue
+	Start-Process $path
+
 
 }
 
+
+# copy a image, from any source, and paste it on a specified path
 function Save-ClipboardImage {
     [alias("ss")]
     param(
         [string]$dir = (Get-Location).Path,
-        [bool]$setPathToClipboard = $true
     )
 
     $origLoc = (Get-Location).Path
@@ -106,7 +125,7 @@ function Save-ClipboardImage {
         }
         else {
             Write-Error "No image found in clipboard."
-            return $null
+            return
         }
     }
 
@@ -114,9 +133,8 @@ function Save-ClipboardImage {
     $FileName = Read-Host "Enter the file name (without extension)"
     $FileName = (Split-Path $dir -leaf) + (Get-Date -Format "_MM_dd_yyyy_") + $FileName
 
-    # Write-Host $FileName
-
     # Check if the file name is empty
+	# change this chatgpt validation wtf
     if (-not [string]::IsNullOrEmpty($FileName)) {
         Set-Location $dir        
         $FilePath = Join-Path -Path (Get-Location).Path -ChildPath "$FileName.png"
@@ -129,18 +147,14 @@ function Save-ClipboardImage {
         Write-Error "File name cannot be empty."
     }
 
-    if ($setPathToClipboard) {
-        Set-Clipboard $FilePath
-        Write-Host "`nPath copied, ready to paste as path`n" -ForegroundColor Green
-    } else {
-        Write-Host "You can always copy the path by selecting the path above."
-    }
-
+    Set-Clipboard $FilePath
+    Write-Host "`nPath copied, ready to paste as path`n" -ForegroundColor Green
     Set-Location $origLoc
 
 }
 
 
+# open file explorer on browser, ideal for low-resources pcs
 function Open-EdgeFileExplorer{ 
     [alias("browse")]
     param(
@@ -158,7 +172,8 @@ function Open-EdgeFileExplorer{
     
 }
 
- 
+
+ # set powershell theme
 function Set-PowershellTheme {
     [alias("setPowTheme")]
     param (
@@ -169,69 +184,90 @@ function Set-PowershellTheme {
     $json | ConvertTo-Json -depth 100 | Set-Content $LocalPowershellSettings
 }
 
+
+# change workspace accordingly
+# switching from dark mode to light mode and viceversa
 function Set-Workspace {
     [alias("workspace")]
     param(
+		[Parameter(Mandatory=$true)]
         [string]$val,
         [switch]$officeMode,
 		[switch]$kill
 
     ) 
-    $registryPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
-    $isDarkModeEnabled = ((Get-ItemPropertyValue -Path $registryPath -Name AppsUseLightTheme) -eq 0) -and ((Get-ItemPropertyValue -Path $registryPath -Name SystemUsesLightTheme) -eq 0)
+	
+	$registryPath = Registry::HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize\
+	$appsInDarkMode = Get-ItemPropertyValue $registryPath AppsUseLightTheme
+	$systemInDarkMode = Get-ItemPropertyValue $registryPath SystemUsesLightTheme
+    $isDarkModeEnabled = $appsInDarkMode -and $systemInDarkMode
+
 	
     if ($val -in @('w', 'wolfram','light-mode') ){
         $pict = Join-Path -Path $WallPaperImagesDirectory -ChildPath "working.jpg"
+	
+		if($officeMode){
+			Write-Host "Office Mode selected. Openning Zoom and Mitel."
+           	Set-Location $WorkDirectory
+           	Mitel.exe
+           	Open-Zoom
+			Write-Host "Current directory changed to $WorkDirectory."
+		}
 
         if ($isDarkModeEnabled){
-            Write-Host "`nSetting light mode"
+    		# as per the reddit post:
+			# https://www.reddit.com/r/Windows11/comments/11h4p5c/programatically_change_to_dark_mode_in_windows_11/
+			# seems impossible to do it from powershell
             Start-Process ms-settings:colors
-            Write-Host "`nSetting light mode on pow"
+            Write-Host "Setting light mode on Powershell."
             Set-PowershellTheme 'One Half Light (Copy)'
-            
-			if($officeMode){
-				Write-Host "`nMoving... "
-            	Set-Location $WorkDirectory
-				Write-Host "`nOpening Mitel..."
-            	Mitel.exe
-            	Write-Host "`nOpening Zoom...`n"
-            	Open-Zoom
-			}
-
-
         } else {
-            Write-Host "Computer is already set on light mode. No changes will apply"
+            Write-Host "Computer is already set on light mode. No changes will be applied." -ForegroundColor Yellow
         }
         
+		
     } elseif ($val -in @('o', 'out','dark','darkmode','dark-mode')) {
+
+		# select random wallpaper from wallpaper directory
         $wallpapers = Get-ChildItem (Join-Path -Path $WallPaperImagesDirectory -ChildPath "real_wallpapers")
         $rand = Get-Random -Maximum ($wallpapers).count
         $pict = $wallpapers[$rand].FullName
+
+        if ($kill) {
+			Write-Warning "You may lose data. Proceed cautiously."
+            Get-Process | Where-Object {$_.ProcessName -match 'mitel'} | Stop-Process
+            Get-Process | Where-Object {$_.ProcessName -match 'zoom'} | Stop-Process
+			$openVPNPath = Join-Path $env:PROGRAMFILES -ChildPath "OpenVPN\bin\openvpn-gui.exe"
+			if (Test-Path $openVPNPath) {
+				& $openVPNPath --command disconect_all
+			}
+ 
         
         if (-not ($isDarkModeEnabled)){
-            Write-Host "Setting dark mode"
+			# as per the reddit post:
+			# https://www.reddit.com/r/Windows11/comments/11h4p5c/programatically_change_to_dark_mode_in_windows_11/
+			# seems impossible to do it from powershell
             Start-Process ms-settings:colors
-            Write-Host "Setting dark mode on pow"
+            Write-Host "Setting dark mode on Powershell."
             Set-PowershellTheme 'One Half Dark'
             Set-Location $Env:HOMEPATH
-
-            if ($kill) {
-                Get-Process | Where-Object {$_.ProcessName -match 'mitel'} | Stop-Process
-                Get-Process | Where-Object {$_.ProcessName -match 'zoom'} | Stop-Process
-                openvpn --command disconect_all
-            }
-
+           }
         } else {
             Write-Host "Computer is already set on dark mode. Changing desktop wallpaper accordingly." -ForegroundColor Blue
         }
 
     } else {
-        Write-Host "`nWrong Flag. Run Again`n" -ForegroundColor Red
+        Write-Error -Message "Invalid Argument." -Category InvalidArgument
     }
+	# TODO: implement try - catch for profiles not having imported VirtualDesktop
+	# or implement from scratch
 	# From https://www.powershellgallery.com/Packages/VirtualDesktop/1.5.7
     Set-AllDesktopWallpapers $pict
 }
 
+
+# function that shows screenshots, same idea as file explorer on browser,
+# made for low-resource computers.
 function Show-Screenshot {
     [alias("showss")]
     param(
@@ -251,6 +287,8 @@ function Show-Screenshot {
 
 }
 
+
+# function that copies the current path to clipboard
 function Copy-Path {
     [alias("cpa")] 
     param(
@@ -259,6 +297,9 @@ function Copy-Path {
     Set-Clipboard (Resolve-Path $path).ToString() 
 } 
 
+
+# function that opens yt videos as /embed/
+# probably deprecated
 function Get-YouTube {
     [alias("yt")]
     param(
@@ -291,19 +332,23 @@ function Get-YouTube {
 
 }
 
+
+# opens powershell in admin mode 
 function Start-PowershellAdminMode{
     [alias("powad")]
     param()
     Start-Process powershell -Verb RunAs
 }
 
+
+# opens microsoft office software from commandline
 function Open-MicrosoftOffice {
 	[alias("msof")]
     param(
 		[string]$val
 	)
-    $officePath = 'C:\Program Files\Microsoft Office\root\Office16' 
-	
+
+	$officePath = Join-Path $env:PROGRAMFILES -ChildPath "Microsoft Office\root\Office16"
     switch($val){
 		'word'	{Start-Process (Join-Path $officePath -ChildPath 'WINWORD.exe') }
 		'excel'	{Start-Process (Join-Path $officePath -ChildPath 'EXCEL.exe') }
@@ -313,9 +358,13 @@ function Open-MicrosoftOffice {
 	
 }
 
+
+# searches on the udm=14 interface of chrome
 function Open-GoogleSearch {
     [alias("google")]
-    param()
+    param(
+
+	)
  
     if(-not $args){
         $search = (Get-Clipboard).Replace(" ","+")
@@ -324,53 +373,13 @@ function Open-GoogleSearch {
     }
 
     $url = "https://www.google.com/search?q=$search&udm=14"
-
     Start-Process msedge -ArgumentList $url
 
 }
 
-function Write-ToLog {
-	[alias("log")]
-	param(
-		[string] $category, 
-		[string] $log,
-		[int] $check
-	)
 
-	if ($check) {
-		Write-Host "`nFrom latest to earliest" -ForegroundColor Blue
-		"SELECT * FROM log ORDER BY timestamp DESC LIMIT $check" | sqlite3 $LogDatabase
-		Write-Host "`n"
-		break
-	}
-	
-	$validCategoryList = @('w','o','s', 'h')
-	if (-not ( ($category) -and ($category -in $validCategoryList) )) {
-		:validation do {
-		$category = Read-Host "Is this (w)ork, (o)ut, (h)ome or (s)tudying?"
-		if (-not ($category -in $validCategoryList)){
-			Write-Host "This is not a valid option!" -ForegroundColor Red				
-			Write-Host "Validating again`n" -ForegroundColor Yellow
-		} else {
-			break validation	
-		}	
-		} while ($true)
-	}
-
-	if(-not $log){
-		$log = Read-Host "Enter a brief description of what you want to log"
-	}
-	
-	#Making sure that $log does not contains "'" (escape characters by default on sqlite3)
-	$log = $log.Replace("'","''")
-
-
-	$command = "INSERT INTO log VALUES (strftime('%Y-%m-%d %H:%M:%S','now','localtime'),'$category','$log')"
-	
-	#Warning! This is insecure since it's prone to SQL inkections. 
-	$command | sqlite3.exe $LogDatabase  
-}
-
+# hides folders / files from a simple 'ls'
+# https://stackoverflow.com/a/67226308/29272030
 function Set-HideItem {
 	[alias("hide")]	
 	param(
@@ -387,6 +396,11 @@ function Set-HideItem {
 
 }
 
+
+# function that cd's to a file directory
+# if file does not exist, creates it
+# 	choose between directory or file
+# TODO: check if still works
 function Set-LocationModified {
 	[alias("mcd")] 
 
@@ -427,6 +441,7 @@ Select any of the following options:
 }
 
 
+# print time in mini-hash time zones
 function Get-Time {
 	[alias("time")]
 	param(
@@ -448,6 +463,7 @@ function Get-Time {
 }
 
 
+# small todo management
 function New-Todo{
 	[alias("todo")]
 	param(
@@ -475,6 +491,8 @@ function New-Todo{
 	Write-Host "New todo file: $name"
 }
 
+
+# custom prompt for powershell
 function prompt {
 	$path = (Get-Location).Path.Replace("$env:USERPROFILE", "~") 
 	$user = $env:USERNAME
