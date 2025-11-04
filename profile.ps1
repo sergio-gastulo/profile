@@ -111,7 +111,7 @@ function Open-Wolfram {
 function Save-ClipboardImage {
     [alias("ss")]
     param(
-        [string]$dir = (Get-Location).Path,
+        [string]$dir = (Get-Location).Path
     )
 
     $origLoc = (Get-Location).Path
