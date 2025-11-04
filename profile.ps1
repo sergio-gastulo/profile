@@ -430,10 +430,21 @@ Select any of the following options:
 function Get-Time {
 	[alias("time")]
 	param(
-		[string] $offset
+
 	)
 
-	(Get-Date).AddHours($offset)
+	$timezones = [ordered]@{
+		"chicago"	=	-1
+		"lima"		= 	0
+		"madrid"	=	6
+	}
+	
+	foreach ( $timezone in $timezones.GetEnumerator() ) {
+		$time = (Get-Date).AddHours($timezone.Value).ToShortTimeString()
+		$city = $timezone.Name.ToUpper()
+		Write-Host "Current time in $city : $time"
+	}
+
 }
 
 
@@ -462,4 +473,19 @@ function New-Todo{
 
 	New-Item -Name $name -ItemType "File"
 	Write-Host "New todo file: $name"
+}
+
+function prompt {
+	$path = (Get-Location).Path.Replace("$env:USERPROFILE", "~") 
+	$user = $env:USERNAME
+	$computer = ($env:COMPUTERNAME).ToLower()
+	$ssh = "[$user@$computer]"
+	$time = get-date -Format "HH:mm:ss"
+
+	Write-Host "PS " -NoNewline -ForegroundColor Yellow
+	Write-Host "($time) " -NoNewline -ForegroundColor Yellow
+	Write-Host "${ssh}: " -NoNewline -ForegroundColor Green
+	Write-Host "$path" -ForegroundColor Cyan
+	return "> "
+
 }
