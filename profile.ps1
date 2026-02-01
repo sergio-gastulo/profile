@@ -71,8 +71,9 @@ function Open-Zoom {
 function Open-Wolfram {
     [alias("wolfram")]
     param (
-        [string]$v,
-		[switch]$listversions
+		[Parameter(Position=0, mandatory=$true)]
+        [string]$version,
+		[switch]$listversion
     )
 
 	$GeneralDirectory = Join-Path -Path $env:PROGRAMFILES -ChildPath "Wolfram Research"
@@ -89,15 +90,15 @@ function Open-Wolfram {
 	}
 	
 	
-    $versionTuple = $v.Split(".")
+    $versionTuple = $version.Split(".")
     if (
         ($versionTuple[0] -lt 14) -or
         ($versionTuple[0] -eq 14 -and $versionTuple[1] -eq 0)
     ) {
-        $path = (Join-Path -Path $MathematicaDir -ChildPath "$v\Mathematica.exe")
+        $path = (Join-Path -Path $MathematicaDir -ChildPath "$version\Mathematica.exe")
     } else
     {
-        $path = (Join-Path -Path $WolframDir -ChildPath "$v\WolframNB.exe")
+        $path = (Join-Path -Path $WolframDir -ChildPath "$version\WolframNB.exe")
     }
 	
 	Write-Host "Starting: $path" -ForegroundColor Blue
@@ -197,24 +198,24 @@ function Set-Workspace {
 
     ) 
 	
-	$registryPath = Registry::HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize\
-	$appsInDarkMode = Get-ItemPropertyValue $registryPath AppsUseLightTheme
-	$systemInDarkMode = Get-ItemPropertyValue $registryPath SystemUsesLightTheme
-    $isDarkModeEnabled = $appsInDarkMode -and $systemInDarkMode
+	$registryPath = "Registry::HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize\"
+	$appsInLightMode = Get-ItemPropertyValue $registryPath AppsUseLightTheme
+	$systemInLightMode = Get-ItemPropertyValue $registryPath SystemUsesLightTheme
+    $isLightModeEnabled = $appsInLightMode -and $systemInLightMode
 
 	
     if ($val -in @('w', 'wolfram','light-mode') ){
         $pict = Join-Path -Path $WallPaperImagesDirectory -ChildPath "working.jpg"
-	
+		Get-Time -city chicago
 		if($officeMode){
-			Write-Host "Office Mode selected. Openning Zoom and Mitel."
-           	Set-Location $WorkDirectory
-           	Mitel.exe
+			Write-Host "Office Mode selected. Openning Zoom." 
+      		Set-Location $WorkDirectory
            	Open-Zoom
 			Write-Host "Current directory changed to $WorkDirectory."
+			
 		}
 
-        if ($isDarkModeEnabled){
+        if (-not $isLightModeEnabled){
     		# as per the reddit post:
 			# https://www.reddit.com/r/Windows11/comments/11h4p5c/programatically_change_to_dark_mode_in_windows_11/
 			# seems impossible to do it from powershell
@@ -232,18 +233,16 @@ function Set-Workspace {
         $wallpapers = Get-ChildItem (Join-Path -Path $WallPaperImagesDirectory -ChildPath "real_wallpapers")
         $rand = Get-Random -Maximum ($wallpapers).count
         $pict = $wallpapers[$rand].FullName
+		Get-Time -city madrid
 
         if ($kill) {
 			Write-Warning "You may lose data. Proceed cautiously."
             Get-Process | Where-Object {$_.ProcessName -match 'mitel'} | Stop-Process
             Get-Process | Where-Object {$_.ProcessName -match 'zoom'} | Stop-Process
 			$openVPNPath = Join-Path $env:PROGRAMFILES -ChildPath "OpenVPN\bin\openvpn-gui.exe"
-			if (Test-Path $openVPNPath) {
-				& $openVPNPath --command disconect_all
-			}
- 
+		} 
         
-        if (-not ($isDarkModeEnabled)){
+        if ($isLightModeEnabled){
 			# as per the reddit post:
 			# https://www.reddit.com/r/Windows11/comments/11h4p5c/programatically_change_to_dark_mode_in_windows_11/
 			# seems impossible to do it from powershell
@@ -252,12 +251,12 @@ function Set-Workspace {
             Set-PowershellTheme 'One Half Dark'
             Set-Location $Env:HOMEPATH
            }
-        } else {
+        else {
             Write-Host "Computer is already set on dark mode. Changing desktop wallpaper accordingly." -ForegroundColor Blue
         }
 
     } else {
-        Write-Error -Message "Invalid Argument." -Category InvalidArgument
+        Write-Error -Message "Invalid Argument." -Category InvalidArgument -ErrorAction Stop
     }
 	# TODO: implement try - catch for profiles not having imported VirtualDesktop
 	# or implement from scratch
@@ -336,8 +335,13 @@ function Get-YouTube {
 # opens powershell in admin mode 
 function Start-PowershellAdminMode{
     [alias("powad")]
-    param()
-    Start-Process powershell -Verb RunAs
+    param(
+		
+	)
+    Start-Process powershell `
+	-WorkingDirectory (Get-Location) `
+	-Verb RunAs `
+	-ArgumentList "-noprofile"
 }
 
 
@@ -407,35 +411,36 @@ function Set-LocationModified {
 	param(
 		[string] $path
 	)
-	
-	if(-not (Test-Path $path)){ # if file doesn't exist
-		$opt = $null 
+
+	# if file doesn't exist
+	if(-not (Test-Path $path)){
+		
 		Write-Host "'$path' is not a valid path."
 		Write-Host @"
-Select any of the following options:
-	{
-		d: create directory '$path'
-		f: create file '$path'
-		q: quit
-	}
+	Select any of the following options:
+		{
+			d: create directory '$path'
+			f: create file '$path'
+			q: quit
+		}
 "@
 		$opt = Read-Host "[d/f/[q]]"
 		switch ($opt) {
 			'd' {New-Item $path -ItemType "Directory"}
 			'f' {New-Item $path -ItemType "File"}
-			'q' {return}
-			Default {Write-Host "Unknown option. Breaking" -ForegroundColor Red; break}
+			Default {
+				Write-Host "Bye."
+				return
+				}
 		}	
 	}
-
-	$path = Get-Item (Resolve-Path $path)
-
-	if ($path.PSIsContainer) {
-		# If it's a directory, move to directory.
+	
+	if (Test-Path $path -PathType Leaf) {
+		Set-Location (Split-Path $path)
+	} elseif (Test-Path $path -PathType Container) {
 		Set-Location ($path)
 	} else {
-		# If it's a file, move to directory where it is located, move to directory where it is located..
-		Set-Location (Split-Path $path)
+		Write-Host "Unkown error."
 	}
 	
 }
@@ -445,19 +450,29 @@ Select any of the following options:
 function Get-Time {
 	[alias("time")]
 	param(
-
+		[string] $city
 	)
 
+	# time zones in UTC
 	$timezones = [ordered]@{
-		"chicago"	=	-1
-		"lima"		= 	0
-		"madrid"	=	6
+		"chicago"	=	-6
+		"lima"		= 	-5
+		"madrid"	=	+1
+		"tokyo"		= 	+9
 	}
-	
+		
+	if ($city.ToLower() -in $timezones.keys) {
+		$Global:offset = $timezones[$city]
+		$uCity = $city.substring(0,1).ToUpper() + $city.substring(1).ToLower()
+		Write-Host "Changing current TimeZone to $uCity."
+		return
+	}
+
+
 	foreach ( $timezone in $timezones.GetEnumerator() ) {
-		$time = (Get-Date).AddHours($timezone.Value).ToShortTimeString()
+		$time = (Get-Date).ToUniversalTime().AddHours($timezone.Value).ToShortTimeString()
 		$city = $timezone.Name.ToUpper()
-		Write-Host "Current time in $city : $time"
+		Write-Host "Current time in $city`: $time"
 	}
 
 }
@@ -467,11 +482,12 @@ function Get-Time {
 function New-Todo{
 	[alias("todo")]
 	param(
-		[string] $name,
-		[switch] $move
+		[string] $suffix,
+		[switch] $move,
+		[string] $search
 	)
 	
-	if ($move){
+	if ($move) {
 		# first search for TODOs on current directory
 		$todos = Get-ChildItem . -Filter 'todo*'
 		# move them to TODO's dir
@@ -482,28 +498,63 @@ function New-Todo{
 		return
 	}
 
-	if (-not $name) {
-		$name = (Get-Date).ToString("yyyy-MM-dd")
-	}
-	$name = "todo-" + $name
+	if($search) {
+		Write-Host "Searching for $search in $TODODirectory`:"
+		findstr.exe /s /i /n $search .\documents_personal\todos\*
+		return
+	}	
 
-	New-Item -Name $name -ItemType "File"
+	if (-not $suffix) {
+		$date = (Get-Date).ToString("yyyy-MM-dd")
+	}
+
+	$name = "todo-" + $date
+
+	New-Item -Name $name -ItemType "File" | Out-Null
 	Write-Host "New todo file: $name"
 }
 
 
 # custom prompt for powershell
 function prompt {
-	$path = (Get-Location).Path.Replace("$env:USERPROFILE", "~") 
+	$path = Split-Path (Resolve-Path .) -Leaf
 	$user = $env:USERNAME
 	$computer = ($env:COMPUTERNAME).ToLower()
-	$ssh = "[$user@$computer]"
-	$time = get-date -Format "HH:mm:ss"
+	$ssh = "[$user@$computer] "
+	$timeFormat = "HH:mm:ss"
+	if (-not $Global:offset) {
+		$Global:offset = -5 # default offset : lima
+	}
+	$time = (Get-Date).ToUniversalTime().AddHours($Global:offset).ToString($timeFormat)
+	$battery = (Get-WmiObject -Class Win32_Battery).EstimatedChargeRemaining
 
-	Write-Host "PS " -NoNewline -ForegroundColor Yellow
-	Write-Host "($time) " -NoNewline -ForegroundColor Yellow
-	Write-Host "${ssh}: " -NoNewline -ForegroundColor Green
-	Write-Host "$path" -ForegroundColor Cyan
+	Write-Host "PS (" -NoNewline
+	Write-Host $time -NoNewline -ForegroundColor Yellow
+	Write-Host ") ($battery %) " -NoNewline 
+	Write-Host $ssh -NoNewline 
+	Write-Host $path -ForegroundColor Cyan
 	return "> "
 
 }
+
+function New-TemporaryVimFileEdit {
+	[alias("vimt")]
+	param(
+		[switch] $Force,
+		[string] $fileName = "t"
+	)
+
+	if( (Test-Path $fileName) -and (-not $Force) ){
+		Write-Host "File exists. It will not be removed unless the -Force option is used."
+		return
+	}
+
+	Remove-Item $fileName -ErrorAction SilentlyContinue
+	New-Item $fileName | Out-Null
+	vim.exe $fileName
+	Get-Content $fileName | Set-Clipboard
+	Write-Host "Content set to clipboard."
+
+}
+
+# implement refreshenv from chocolatey: https://github.com/chocolatey/choco/blob/stable/src/chocolatey.resources/helpers/functions/Get-EnvironmentVariable.ps1
