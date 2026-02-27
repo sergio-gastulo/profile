@@ -178,10 +178,11 @@ function Open-EdgeFileExplorer{
 function Set-PowershellTheme {
     [alias("setPowTheme")]
     param (
-        [string]$theme
+        [string] $theme
     )
     $json = Get-Content $LocalPowershellSettings | ConvertFrom-Json
     $json.profiles.list[0].colorScheme = $theme
+    $json.profiles.list[1].colorScheme = $theme
     $json | ConvertTo-Json -depth 100 | Set-Content $LocalPowershellSettings
 }
 
@@ -206,8 +207,8 @@ function Set-Workspace {
 	
     if ($val -in @('w', 'wolfram','light-mode') ){
         $pict = Join-Path -Path $WallPaperImagesDirectory -ChildPath "working.jpg"
-		Get-Time -city chicago
 		if($officeMode){
+			Get-Time -city chicago
 			Write-Host "Office Mode selected. Openning Zoom." 
       		Set-Location $WorkDirectory
            	Open-Zoom
@@ -458,6 +459,7 @@ function Get-Time {
 		"chicago"	=	-6
 		"lima"		= 	-5
 		"madrid"	=	+1
+		"bhubaneswar" = +5.5
 		"tokyo"		= 	+9
 	}
 		
@@ -488,7 +490,6 @@ function New-Todo{
 	)
 	
 	if ($move) {
-		# first search for TODOs on current directory
 		$todos = Get-ChildItem . -Filter 'todo*'
 		# move them to TODO's dir
 		foreach ($todo in $todos) {
@@ -498,9 +499,9 @@ function New-Todo{
 		return
 	}
 
-	if($search) {
+	if ($search) {
 		Write-Host "Searching for $search in $TODODirectory`:"
-		findstr.exe /s /i /n $search .\documents_personal\todos\*
+		findstr.exe /s /i /n $search $TODODirectory\*
 		return
 	}	
 
@@ -508,10 +509,17 @@ function New-Todo{
 		$date = (Get-Date).ToString("yyyy-MM-dd")
 	}
 
-	$name = "todo-" + $date
+	# always writing to pwd
+	$name = ("todo-" + $date)
+
+	if (Test-Path $name) {
+		Write-Host "File already exists. Consider running todo -move."
+		return
+	}
 
 	New-Item -Name $name -ItemType "File" | Out-Null
 	Write-Host "New todo file: $name"
+	vim.exe $name
 }
 
 
@@ -526,11 +534,12 @@ function prompt {
 		$Global:offset = -5 # default offset : lima
 	}
 	$time = (Get-Date).ToUniversalTime().AddHours($Global:offset).ToString($timeFormat)
-	$battery = (Get-WmiObject -Class Win32_Battery).EstimatedChargeRemaining
+	$batteryPercentage = (Get-WmiObject -Class Win32_Battery).EstimatedChargeRemaining
+	$batteryCharging = if ((Get-WmiObject -Class BatteryStatus -Namespace "root\wmi").Charging) { '+' } else {''}
 
 	Write-Host "PS (" -NoNewline
 	Write-Host $time -NoNewline -ForegroundColor Yellow
-	Write-Host ") ($battery %) " -NoNewline 
+	Write-Host ") ($batteryPercentage$batteryCharging %) " -NoNewline 
 	Write-Host $ssh -NoNewline 
 	Write-Host $path -ForegroundColor Cyan
 	return "> "
@@ -557,4 +566,15 @@ function New-TemporaryVimFileEdit {
 
 }
 
+function Open-Steam {
+	[alias("steam")]
+	param(
+
+	)
+	$steam = [System.IO.Path]::Combine(${env:ProgramFiles(x86)}, "Steam", "steam.exe")
+	Start-Process $steam
+
+}
+
 # implement refreshenv from chocolatey: https://github.com/chocolatey/choco/blob/stable/src/chocolatey.resources/helpers/functions/Get-EnvironmentVariable.ps1
+# implement some sort of macro for autoclick and pressing keyboard keys.
